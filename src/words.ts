@@ -1,0 +1,22 @@
+export const words = [
+  'CAT',
+  'DOG',
+  'SUN',
+  'HAT',
+  'BALL',
+  'STAR',
+  'FISH',
+  'TREE',
+  'BOOK',
+  'MOON',
+  'BIRD',
+  'DUCK',
+  'FROG',
+  'SHIP',
+  'BEAR',
+  'LION',
+  'CAKE',
+  'RAIN',
+  'LEAF',
+  'HOME'
+];

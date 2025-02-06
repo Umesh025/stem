@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float-left {
+  from {
+    transform: translateX(100vw);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.sunburst {
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgb(56, 189, 248) 0deg 20deg,
+    rgb(103, 232, 249) 20deg 40deg
+  );
+  animation: rotate 60s linear infinite;
+  transform-origin: center;
+  scale: 2.5;
+}
+
+.clouds-container {
+  pointer-events: none;
+}
+
+.cloud {
+  animation: float-left 20s linear infinite;
+}
+
+.cloud-slow {
+  animation-duration: 30s;
+}
+
+.cloud-fast {
+  animation-duration: 25s;
+}
+
+.letter-box {
+  @apply w-16 h-16 bg-white rounded-xl shadow-lg flex items-center justify-center text-3xl font-bold text-blue-600;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+  transition: all 0.3s ease;
+}
+
+.missing-letter {
+  @apply bg-blue-100 border-4 border-dashed border-blue-300;
+  animation: pulse 2s infinite;
+}
+
+.correct-guess {
+  @apply bg-green-400 border-green-500;
+  animation: celebrate 0.5s ease-out;
+}
+
+.wrong-guess {
+  @apply bg-red-400 border-red-500;
+  animation: shake 0.5s ease-in-out;
+}
+
+.score-box {
+  animation: pop 0.3s ease-out;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes celebrate {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2) rotate(10deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s infinite;
+}
