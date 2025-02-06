@@ -4,6 +4,7 @@ import { words } from './words';
 
 function App() {
   const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
   const [currentWord, setCurrentWord] = useState('');
   const [hiddenIndex, setHiddenIndex] = useState(-1);
   const [userGuess, setUserGuess] = useState('');
@@ -18,6 +19,15 @@ function App() {
     const index = Math.floor(Math.random() * word.length);
     setCurrentWord(word);
     setHiddenIndex(index);
+    setUserGuess('');
+    setIsCorrect(null);
+  };
+
+  const resetGame = () => {
+    setScore(0);
+    setLives(3);
+    setCurrentWord('');
+    setHiddenIndex(-1);
     setUserGuess('');
     setIsCorrect(null);
   };
@@ -67,9 +77,10 @@ function App() {
       if (key === '9') {
         return; // Math mode is disabled for now
       }
-      if (key === 'Z' || key === 'z') {
+      if (key === 'Z') {
         setGameMode('english');
         setShowSelection(false);
+        resetGame();
         pickNewWord();
       }
     };
@@ -81,8 +92,8 @@ function App() {
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       const key = event.key.toUpperCase();
-      if (!/^[A-Z]$/.test(key) || !currentWord) return;
-      console.log("pressed key:", key);
+      if (!/^[A-Z]$/.test(key) || !currentWord || lives <= 0) return;
+      
       setUserGuess(key);
       const correct = key === currentWord[hiddenIndex];
       setIsCorrect(correct);
@@ -90,12 +101,27 @@ function App() {
       if (correct) {
         setScore(prev => prev + 1);
         setTimeout(pickNewWord, 1500);
+      } else {
+        setLives(prev => Math.max(0, prev - 1));
+        if (lives <= 1) {
+          setTimeout(() => {
+            setShowSelection(true);
+            setGameMode(null);
+            resetGame();
+          }, 1500);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentWord, hiddenIndex]);
+  }, [currentWord, hiddenIndex, lives]);
+
+  const handleExit = () => {
+    setShowSelection(true);
+    setGameMode(null);
+    resetGame();
+  };
 
   return (
     <div className="min-h-screen overflow-hidden relative bg-gradient-to-b from-sky-300 to-sky-500">
@@ -133,6 +159,13 @@ function App() {
         </video>
       ) : (
         <>
+          <button
+            onClick={handleExit}
+            className="absolute top-4 left-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-20"
+          >
+            Finish
+          </button>
+
           {/* Sunburst Background */}
           <div className="sunburst absolute inset-0" />
           
@@ -154,10 +187,19 @@ function App() {
           </div>
 
           {/* Game Content */}
-          <div className="relative z-10 flex flex-col items-center pt-8">
-            {/* Score */}
-            <div className="score-box bg-yellow-300 px-6 py-3 rounded-xl shadow-lg mb-8 transform hover:scale-110 transition-transform">
-              <span className="text-2xl font-bold">Score: {score}</span>
+          <div className="relative z-10 flex flex-col items-center pt-8 mt-20">
+            {/* Score and Lives */}
+            <div className="flex gap-4 mb-8">
+              <div className="score-box bg-yellow-300 px-6 py-3 rounded-xl shadow-lg transform hover:scale-110 transition-transform">
+                <span className="text-2xl font-bold">Score: {score}</span>
+              </div>
+              <div className="lives-box bg-red-400 px-6 py-3 rounded-xl shadow-lg">
+                <span className="text-2xl font-bold">
+                  {[...Array(Math.max(0, lives))].map((_, i) => (
+                    <span key={i} role="img" aria-label="heart">❤️</span>
+                  ))}
+                </span>
+              </div>
             </div>
 
             {/* Word Display */}
