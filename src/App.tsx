@@ -59,7 +59,7 @@ function App() {
     const handleWelcomeKey = (event: KeyboardEvent) => {
       if (!showWelcome) return;
       
-      if (event.key.toUpperCase() === 'S' && !showSelection) {
+      if (event.key === '*' && !showSelection) {
         setShowWelcome(false);
         setShowSelection(true);
       }
@@ -91,6 +91,13 @@ function App() {
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
+      if (!gameMode) return; // Only handle when in game
+      
+      if (event.key === '!') {
+        handleExit();
+        return;
+      }
+
       const key = event.key.toUpperCase();
       if (!/^[A-Z]$/.test(key) || !currentWord || lives <= 0) return;
       
@@ -115,7 +122,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentWord, hiddenIndex, lives]);
+  }, [currentWord, hiddenIndex, lives, gameMode]);
 
   const handleExit = () => {
     setShowSelection(true);
