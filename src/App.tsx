@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Cloud } from 'lucide-react';
 import { words } from './words';
 
@@ -13,126 +13,222 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSelection, setShowSelection] = useState(false);
   const [gameMode, setGameMode] = useState<'math' | 'english' | null>(null);
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000;
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const pickNewWord = () => {
+  // Add a ref to track the current game mode
+  const gameModeRef = useRef(gameMode);
+  
+  // Update ref when gameMode changes
+  useEffect(() => {
+    gameModeRef.current = gameMode;
+    console.log('Game mode updated:', gameMode);
+  }, [gameMode]);
+
+  const pickNewWord = useCallback(() => {
+    if (gameMode !== 'english') {
+      console.log('Warning: Attempting to pick word without game mode set');
+      return;
+    }
+    // setGameMode('english');
     const word = words[Math.floor(Math.random() * words.length)];
     const index = Math.floor(Math.random() * word.length);
+    console.log('Picking new word:', { 
+      word, 
+      hiddenIndex: index,
+      currentGameMode: gameMode
+    });
+    
     setCurrentWord(word);
     setHiddenIndex(index);
     setUserGuess('');
     setIsCorrect(null);
-  };
+    setIsTransitioning(false);
+  }, [gameMode]);
 
-  const resetGame = () => {
+  const resetGame = useCallback(() => {
     setScore(0);
     setLives(3);
     setCurrentWord('');
     setHiddenIndex(-1);
     setUserGuess('');
     setIsCorrect(null);
-  };
+  }, []);
 
-  useEffect(() => {
-    if (!showIntro) return; // Only run timer if we're showing the intro
-
-    console.log("Logo timeout started");
-    const timer = setTimeout(() => {
-      console.log("Logo timeout finished - transitioning to Welcome");
-      setShowIntro(false);
-      setShowWelcome(true);
-    }, 14000);
-    return () => {
-      console.log("Logo timeout cleanup");
-      clearTimeout(timer);
-    }
-  }, [showIntro]); // Add showIntro to dependencies
-
-  useEffect(() => {
-    console.log("State changed:", {
-      showIntro,
-      showWelcome,
-      showSelection
-    });
-  }, [showIntro, showWelcome, showSelection]);
-
-  useEffect(() => {
-    const handleWelcomeKey = (event: KeyboardEvent) => {
-      if (!showWelcome) return;
-      
-      if (event.key === '*' && !showSelection) {
-        setShowWelcome(false);
-        setShowSelection(true);
-      }
-    };
-
-    window.addEventListener('keydown', handleWelcomeKey);
-    return () => window.removeEventListener('keydown', handleWelcomeKey);
-  }, [showWelcome, showSelection]);
-
-  useEffect(() => {
-    const handleSelection = (event: KeyboardEvent) => {
-      if (!showSelection) return;
-      
-      const key = event.key.toUpperCase();
-      if (key === '9') {
-        return; // Math mode is disabled for now
-      }
-      if (key === 'Z') {
-        setGameMode('english');
-        setShowSelection(false);
-        resetGame();
-        pickNewWord();
-      }
-    };
-
-    window.addEventListener('keydown', handleSelection);
-    return () => window.removeEventListener('keydown', handleSelection);
-  }, [showSelection]);
-
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (!gameMode) return; // Only handle when in game
-      
-      if (event.key === '!') {
-        handleExit();
-        return;
-      }
-
-      const key = event.key.toUpperCase();
-      if (!/^[A-Z]$/.test(key) || !currentWord || lives <= 0) return;
-      
-      setUserGuess(key);
-      const correct = key === currentWord[hiddenIndex];
-      setIsCorrect(correct);
-
-      if (correct) {
-        setScore(prev => prev + 1);
-        setTimeout(pickNewWord, 1500);
-      } else {
-        setLives(prev => Math.max(0, prev - 1));
-        if (lives <= 1) {
-          setTimeout(() => {
-            setShowSelection(true);
-            setGameMode(null);
-            resetGame();
-          }, 1500);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentWord, hiddenIndex, lives, gameMode]);
-
-  const handleExit = () => {
+  const handleExit = useCallback(() => {
     setShowSelection(true);
     setGameMode(null);
     resetGame();
-  };
+  }, [resetGame]);
+
+  useEffect(() => {
+    if (!showIntro) return;
+
+    const timer = setTimeout(() => {
+      setShowIntro(false);
+      setShowWelcome(true);
+    }, 14000);
+    return () => clearTimeout(timer);
+  }, [showIntro]);
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+
+    const connectWebSocket = () => {
+      ws = new WebSocket('ws://localhost:8090');
+
+      ws.onopen = () => {
+        console.log('WebSocket Connected');
+        setWsStatus('connected');
+      };
+
+      ws.onmessage = (event) => {
+        const key = event.data;
+        console.log('WebSocket received:', {
+          data: key,
+          type: typeof key,
+          currentScreen: {
+            showWelcome,
+            showSelection,
+            showIntro,
+            gameMode: gameModeRef.current
+          }
+        });
+
+        // Handle '*' for screen transition
+        if (key === '*') {
+          console.log('Received * - Transitioning to selection screen');
+          setShowIntro(false);
+          setShowWelcome(false);
+          setShowSelection(true);
+          return;
+        }
+
+        // Handle 'Z' for starting English game
+        if (key === 'Z' || key === 'z') {
+          console.log('Starting English game');
+          setShowIntro(false);
+          setShowWelcome(false);
+          setShowSelection(false);
+          setGameMode('english');
+          return;
+        }
+
+        // Handle game inputs
+        if (gameModeRef.current === 'english' && currentWord && !isTransitioning) {
+          console.log('Processing game input with current state:', {
+            gameMode: gameModeRef.current,
+            currentWord,
+            hiddenIndex,
+            lives
+          });
+          const upperKey = key.toUpperCase();
+          
+          // Handle exit command
+          if (key === '!') {
+            handleExit();
+            return;
+          }
+
+          // Handle letter inputs
+          if (/^[A-Z]$/.test(upperKey) && lives > 0) {
+            console.log('=== Debug Info ===');
+            console.log('Current word:', currentWord);
+            console.log('Hidden index:', hiddenIndex);
+            console.log('Hidden letter:', currentWord[hiddenIndex]);
+            console.log('User input:', upperKey);
+            console.log('Current game mode:', gameModeRef.current);
+            
+            const correctLetter = currentWord[hiddenIndex].toUpperCase();
+            const correct = upperKey === correctLetter;
+            
+            setUserGuess(upperKey);
+            setIsCorrect(correct);
+
+            if (correct) {
+              console.log('✅ CORRECT GUESS!');
+              setScore(prev => prev + 1);
+              setIsTransitioning(true);
+              setTimeout(pickNewWord, 1500);
+            } else {
+              console.log('❌ WRONG GUESS!');
+              setLives(prev => {
+                const newLives = prev - 1;
+                if (newLives <= 0) {
+                  console.log('Game Over - Transitioning to selection screen');
+                  setTimeout(() => {
+                    setShowSelection(true);
+                    setGameMode(null);
+                    resetGame();
+                  }, 1500);
+                }
+                return newLives;
+              });
+            }
+          }
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket Error:', error);
+        setWsStatus('disconnected');
+      };
+  
+      ws.onclose = () => {
+        console.log('WebSocket Disconnected');
+        setWsStatus('disconnected');
+      };
+    };
+
+    connectWebSocket();
+  
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [currentWord, lives, isTransitioning, handleExit, pickNewWord]); // Add necessary dependencies
+
+  // Modify the game mode effect to be more robust
+  useEffect(() => {
+    if (gameMode === 'english') {
+      console.log('Game mode changed to English - initializing game');
+      Promise.all([
+        // Update all states in parallel
+        setShowIntro(false),
+        setShowWelcome(false),
+        setShowSelection(false)
+      ]).then(() => {
+        console.log('Screen states updated, initializing game with mode:', gameMode);
+        resetGame();
+        pickNewWord();
+      });
+    }
+  }, [gameMode, resetGame, pickNewWord]);
+
+  // Connection status display component
+  const ConnectionStatus = () => (
+    <div className={`
+      fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-20
+      ${wsStatus === 'connected' ? 'bg-green-500' : 
+        wsStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'}
+      text-white
+    `}>
+      {wsStatus === 'connected' ? 'Connected' :
+       wsStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+    </div>
+  );
 
   return (
+   
+
+  
     <div className="min-h-screen overflow-hidden relative bg-gradient-to-b from-sky-300 to-sky-500">
-      {showIntro ? (
+       <ConnectionStatus />
+       {showIntro ? (
         <video 
           autoPlay 
           muted 
