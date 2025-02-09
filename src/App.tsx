@@ -190,7 +190,7 @@ function App() {
         ws.close();
       }
     };
-  }, [currentWord, lives, isTransitioning, handleExit, pickNewWord]); // Add necessary dependencies
+  }, [currentWord]); // Add necessary dependencies
 
   // Modify the game mode effect to be more robust
   useEffect(() => {
