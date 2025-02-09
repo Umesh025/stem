@@ -1,54 +1,65 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Cloud } from 'lucide-react';
-import { words } from './words';
 
-// Types for better organization
-type GameMode = 'math' | 'english' | null;
-type ScreenState = 'intro' | 'welcome' | 'selection' | 'game';
-type WSStatus = 'connecting' | 'connected' | 'disconnected';
+// Types
+import { 
+  GameMode, 
+  ScreenState, 
+  EnglishGameState, 
+  MathGameState 
+} from './types';
 
-type GameState = {
-  score: number;
-  lives: number;
-  currentWord: string;
-  hiddenIndex: number;
-  userGuess: string;
-  isCorrect: boolean | null;
-  gameMode: GameMode;
-  isTransitioning: boolean;
-};
+// Components
+import { EnglishGame } from './components/games/EnglishGame';
+import { MathGame } from './components/games/MathGame';
+import { GameHeader } from './components/layout/GameHeader';
+
+// Utils and Hooks
+import { generateMathProblem } from './utils/gameLogic';
+import { GAME_CONSTANTS, words } from './utils/constants';
+import { useWebSocket } from './hooks/useWebSocket';
 
 function App() {
   // Screen Management
   const [screenState, setScreenState] = useState<ScreenState>('intro');
   
-  // Game State
-  const [gameState, setGameState] = useState<GameState>({
+  // Ensure we start with intro on mount
+  useEffect(() => {
+    setScreenState('intro');
+    console.log('App mounted, setting initial screen state to intro');
+  }, []);
+  
+  // Game States
+  const [englishState, setEnglishState] = useState<EnglishGameState>({
     score: 0,
-    lives: 3,
+    lives: GAME_CONSTANTS.MAX_LIVES,
     currentWord: '',
     hiddenIndex: -1,
     userGuess: '',
     isCorrect: null,
-    gameMode: null,
+    gameMode: 'english',
     isTransitioning: false
   });
 
-  // WebSocket State
-  const [wsStatus, setWsStatus] = useState<WSStatus>('disconnected');
-  const wsRef = useRef<WebSocket | null>(null);
-  const gameStateRef = useRef<GameState>(gameState);
+  const [mathState, setMathState] = useState<MathGameState>({
+    score: 0,
+    lives: GAME_CONSTANTS.MAX_LIVES,
+    question: '',
+    answer: 0,
+    userAnswer: '',
+    isCorrect: null,
+    gameMode: 'math',
+    isTransitioning: false
+  });
 
-  // Keep gameStateRef current
-  useEffect(() => {
-    gameStateRef.current = gameState;
-  }, [gameState]);
+  const [activeMode, setActiveMode] = useState<GameMode>(null);
 
+  // Game Logic
   const pickNewWord = useCallback(() => {
     const word = words[Math.floor(Math.random() * words.length)];
     const index = Math.floor(Math.random() * word.length);
     
-    setGameState(prev => ({
+    setEnglishState(prev => ({
       ...prev,
       currentWord: word,
       hiddenIndex: index,
@@ -58,12 +69,54 @@ function App() {
     }));
   }, []);
 
-  const processGuess = useCallback((guess: string) => {
-    const currentGameState = gameStateRef.current;
-    const correctLetter = currentGameState.currentWord[currentGameState.hiddenIndex].toUpperCase();
-    const isCorrect = guess === correctLetter;
+  const generateNewMathProblem = useCallback(() => {
+    const { question, answer } = generateMathProblem();
+    setMathState(prev => ({
+      ...prev,
+      question,
+      answer,
+      userAnswer: '',
+      isCorrect: null,
+      isTransitioning: false
+    }));
+  }, []);
 
-    setGameState(prev => {
+  const resetGame = useCallback(() => {
+    setEnglishState(prev => ({
+      ...prev,
+      score: 0,
+      lives: GAME_CONSTANTS.MAX_LIVES,
+      currentWord: '',
+      hiddenIndex: -1,
+      userGuess: '',
+      isCorrect: null,
+      isTransitioning: false
+    }));
+
+    setMathState(prev => ({
+      ...prev,
+      score: 0,
+      lives: GAME_CONSTANTS.MAX_LIVES,
+      question: '',
+      answer: 0,
+      userAnswer: '',
+      isCorrect: null,
+      isTransitioning: false
+    }));
+
+    setActiveMode(null);
+  }, []);
+
+  const handleExit = useCallback(() => {
+    setScreenState('selection');
+    resetGame();
+  }, [resetGame]);
+
+  const processEnglishGuess = useCallback((guess: string) => {
+    setEnglishState(prev => {
+      const correctLetter = prev.currentWord[prev.hiddenIndex].toUpperCase();
+      const isCorrect = guess === correctLetter;
+
       const newState = {
         ...prev,
         userGuess: guess,
@@ -73,136 +126,157 @@ function App() {
 
       if (isCorrect) {
         newState.score = prev.score + 1;
-        setTimeout(pickNewWord, 1500);
+        setTimeout(pickNewWord, GAME_CONSTANTS.TRANSITION_DELAY);
       } else {
         newState.lives = prev.lives - 1;
         if (prev.lives <= 1) {
           setTimeout(() => {
             setScreenState('selection');
             resetGame();
-          }, 1500);
+          }, GAME_CONSTANTS.TRANSITION_DELAY);
         }
       }
 
       return newState;
     });
-  }, [pickNewWord]);
+  }, [pickNewWord, resetGame]);
 
-  // Initialize WebSocket connection once
-  useEffect(() => {
-    const handleWebSocketMessage = (event: MessageEvent) => {
-      const key = event.data;
-      const currentState = gameStateRef.current;
+  const processMathGuess = useCallback((guess: string) => {
+    setMathState(prev => {
+      const isCorrect = parseInt(guess) === prev.answer;
 
-      console.log('WebSocket message received:', {
-        key,
-        gameMode: currentState.gameMode,
-        currentWord: currentState.currentWord,
-        isTransitioning: currentState.isTransitioning
-      });
+      const newState = {
+        ...prev,
+        userAnswer: guess,
+        isCorrect,
+        isTransitioning: isCorrect
+      };
 
-      // Screen transitions
-      if (key === '*') {
-        setScreenState('selection');
-        return;
+      if (isCorrect) {
+        newState.score = prev.score + 1;
+        setTimeout(generateNewMathProblem, GAME_CONSTANTS.TRANSITION_DELAY);
+      } else {
+        newState.lives = prev.lives - 1;
+        if (prev.lives <= 1) {
+          setTimeout(() => {
+            setScreenState('selection');
+            resetGame();
+          }, GAME_CONSTANTS.TRANSITION_DELAY);
+        }
       }
 
+      return newState;
+    });
+  }, [generateNewMathProblem, resetGame]);
+
+  // WebSocket message handler
+  const handleWebSocketMessage = useCallback((event: MessageEvent) => {
+    const key = event.data;
+
+    // Screen transitions
+    if (key === '*') {
+      setScreenState('selection');
+      return;
+    }
+
+    // Game mode selection - only process if we're not already in a game
+    if (screenState !== 'game') {
       if (key === 'Z' || key === 'z') {
         setScreenState('game');
-        setGameState(prev => ({
-          ...prev,
-          gameMode: 'english'
-        }));
+        setActiveMode('english');
         pickNewWord();
         return;
       }
 
-      // Game input handling
-      if (currentState.gameMode === 'english' && 
-          currentState.currentWord && 
-          !currentState.isTransitioning) {
-        const upperKey = key.toUpperCase();
-
-        // Handle exit command
-        if (key === '!') {
-          handleExit();
-          return;
-        }
-
-        // Handle letter inputs
-        if (/^[A-Z]$/.test(upperKey) && currentState.lives > 0) {
-          processGuess(upperKey);
-        }
+      if (key === '9') {
+        setScreenState('game');
+        setActiveMode('math');
+        generateNewMathProblem();
+        return;
       }
-    };
+    }
 
-    const connectWebSocket = () => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    // Handle exit command
+    if (key === '!') {
+      handleExit();
+      return;
+    }
 
-      const ws = new WebSocket('ws://localhost:8090');
-      wsRef.current = ws;
+    // Game input handling
+    const currentState = activeMode === 'english' ? englishState : mathState;
+    if (!activeMode || currentState.isTransitioning) {
+      return;
+    }
 
-      ws.onopen = () => {
-        console.log('WebSocket Connected');
-        setWsStatus('connected');
-      };
+    if (activeMode === 'english') {
+      const upperKey = key.toUpperCase();
+      if (/^[A-Z]$/.test(upperKey)) {
+        processEnglishGuess(upperKey);
+      }
+    } else if (activeMode === 'math') {
+      if (/^[0-9]$/.test(key)) {
+        processMathGuess(key);
+      }
+    }
+  }, [
+    activeMode,
+    englishState,
+    mathState,
+    handleExit,
+    pickNewWord,
+    generateNewMathProblem,
+    processEnglishGuess,
+    processMathGuess
+  ]);
 
-      ws.onclose = () => {
-        console.log('WebSocket Disconnected');
-        setWsStatus('disconnected');
-      };
+  // Use custom WebSocket hook
+  const { status: wsStatus, addMessageHandler, removeMessageHandler } = useWebSocket();
 
-      ws.onerror = (error) => {
-        console.error('WebSocket Error:', error);
-        setWsStatus('disconnected');
-      };
-
-      ws.onmessage = handleWebSocketMessage;
-    };
-
-    connectWebSocket();
-
-    return () => {
-      wsRef.current?.close();
-    };
-  }, [pickNewWord, processGuess]); 
-
-  const resetGame = useCallback(() => {
-    setGameState({
-      score: 0,
-      lives: 3,
-      currentWord: '',
-      hiddenIndex: -1,
-      userGuess: '',
-      isCorrect: null,
-      gameMode: null,
-      isTransitioning: false
-    });
-  }, []);
-
-  const handleExit = useCallback(() => {
-    setScreenState('selection');
-    resetGame();
-  }, [resetGame]);
-
-  // Screen transition effect
+  // Add message handler on mount
   useEffect(() => {
+    addMessageHandler(handleWebSocketMessage);
+    return () => removeMessageHandler(handleWebSocketMessage);
+  }, [handleWebSocketMessage, addMessageHandler, removeMessageHandler]);
+
+  // Screen transition effects
+  useEffect(() => {
+    console.log('Current screen state:', screenState);
     if (screenState === 'intro') {
-      const timer = setTimeout(() => {
-        setScreenState('welcome');
-      }, 14000);
-      return () => clearTimeout(timer);
+      // Don't automatically transition with timer
+      // Let video onEnded handle the transition
+      console.log('Playing intro video');
     }
   }, [screenState]);
 
-  // Game initialization effect
-  useEffect(() => {
-    if (gameState.gameMode === 'english' && !gameState.currentWord) {
-      pickNewWord();
-    }
-  }, [gameState.gameMode, gameState.currentWord, pickNewWord]);
+  // Handle video transitions
+  const handleIntroVideoEnd = () => {
+    console.log('Intro video ended, transitioning to welcome');
+    setScreenState('welcome');
+  };
 
-  // Render helpers
+  // Render background elements
+  const renderBackground = () => (
+    <>
+      <div className="sunburst absolute inset-0" />
+      <div className="clouds-container absolute inset-0">
+        {[...Array(6)].map((_, i) => (
+          <div 
+            key={i} 
+            className={`cloud absolute ${i % 2 === 0 ? 'cloud-slow' : 'cloud-fast'}`}
+            style={{ 
+              top: `${(i * 15) + 5}%`, 
+              left: `${i * 20}%`,
+              transform: `scale(${0.5 + (i % 3) * 0.5})`
+            }}
+          >
+            <Cloud size={64} className="text-white filter drop-shadow-lg" />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
+  // Connection status component
   const ConnectionStatus = () => (
     <div className={`
       fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-20
@@ -220,12 +294,18 @@ function App() {
       
       {screenState === 'intro' && (
         <video 
+          key="intro-video"
           autoPlay 
           muted 
-          onEnded={() => setScreenState('welcome')}
+          playsInline
+          onLoadStart={() => console.log("Logo video loading started")}
+          onLoadedData={() => console.log("Logo video loaded")}
+          onError={(e) => console.error("Logo video error:", e)}
+          onEnded={handleIntroVideoEnd}
           className="absolute inset-0 w-full h-full object-cover"
         >
           <source src="/Logo.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
         </video>
       )}
 
@@ -251,77 +331,17 @@ function App() {
 
       {screenState === 'game' && (
         <>
-          <button
-            onClick={handleExit}
-            className="absolute top-4 left-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-20"
-          >
-            Finish
-          </button>
-
-          <div className="sunburst absolute inset-0" />
+          {renderBackground()}
           
-          <div className="clouds-container absolute inset-0">
-            {[...Array(6)].map((_, i) => (
-              <div 
-                key={i} 
-                className={`cloud absolute ${i % 2 === 0 ? 'cloud-slow' : 'cloud-fast'}`}
-                style={{ 
-                  top: `${(i * 15) + 5}%`, 
-                  left: `${i * 20}%`,
-                  transform: `scale(${0.5 + (i % 3) * 0.5})`
-                }}
-              >
-                <Cloud size={64} className="text-white filter drop-shadow-lg" />
-              </div>
-            ))}
-          </div>
+          <div className="relative z-10 flex flex-col items-center">
+            <GameHeader 
+              gameState={activeMode === 'english' ? englishState : mathState}
+              onExit={handleExit}
+            />
 
-          <div className="relative z-10 flex flex-col items-center pt-8 mt-20">
-            <div className="flex gap-4 mb-8">
-              <div className="score-box bg-yellow-300 px-6 py-3 rounded-xl shadow-lg transform hover:scale-110 transition-transform">
-                <span className="text-2xl font-bold">Score: {gameState.score}</span>
-              </div>
-              <div className="lives-box bg-red-400 px-6 py-3 rounded-xl shadow-lg">
-                <span className="text-2xl font-bold">
-                  {[...Array(Math.max(0, gameState.lives))].map((_, i) => (
-                    <span key={i} role="img" aria-label="heart">❤️</span>
-                  ))}
-                </span>
-              </div>
-            </div>
-
-            {gameState.currentWord && (
-              <div className="flex gap-4 mb-8">
-                {gameState.currentWord.split('').map((letter, index) => (
-                  <div
-                    key={index}
-                    className={`letter-box ${index === gameState.hiddenIndex ? 'missing-letter' : ''} ${
-                      index === gameState.hiddenIndex && gameState.isCorrect !== null
-                        ? gameState.isCorrect
-                          ? 'correct-guess'
-                          : 'wrong-guess'
-                        : ''
-                    }`}
-                  >
-                    {index === gameState.hiddenIndex ? (
-                      gameState.isCorrect === null ? '?' : gameState.userGuess
-                    ) : (
-                      <span className="animate-bounce-subtle">{letter}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="bg-white/30 backdrop-blur-sm p-4 rounded-xl text-center">
-              <p className="text-lg font-semibold text-blue-900">
-                Type any letter to guess the missing character!
-              </p>
-              {gameState.isCorrect === false && (
-                <p className="text-red-700 mt-2">
-                  Try again!
-                </p>
-              )}
+            <div className="mt-20">
+              {activeMode === 'english' && <EnglishGame gameState={englishState} />}
+              {activeMode === 'math' && <MathGame gameState={mathState} />}
             </div>
           </div>
         </>
