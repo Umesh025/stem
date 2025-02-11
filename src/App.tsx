@@ -259,7 +259,7 @@ function App() {
     <>
       <div className="sunburst absolute inset-0" />
       <div className="clouds-container absolute inset-0">
-        {[...Array(6)].map((_, i) => (
+        {[...Array(10)].map((_, i) => (
           <div 
             key={i} 
             className={`cloud absolute ${i % 2 === 0 ? 'cloud-slow' : 'cloud-fast'}`}

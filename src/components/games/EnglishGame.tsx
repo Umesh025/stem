@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { EnglishGameState } from '../../types';
+import { soundManager } from '../../sounds/sound';
 
 interface EnglishGameProps {
   gameState: EnglishGameState;
@@ -7,6 +8,12 @@ interface EnglishGameProps {
 
 export const EnglishGame: React.FC<EnglishGameProps> = ({ gameState }) => {
   const { currentWord, hiddenIndex, userGuess, isCorrect } = gameState;
+
+  useEffect(() => {
+    if (isCorrect !== null) {
+      soundManager.play(isCorrect ? 'correct' : 'wrong');
+    }
+  }, [isCorrect]);
 
   return (
     <div className="flex flex-col items-center gap-8">

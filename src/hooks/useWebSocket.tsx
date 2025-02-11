@@ -1,4 +1,3 @@
-// src/hooks/useWebSocket.ts
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { WSStatus } from '../types';
 import { GAME_CONSTANTS } from '../utils/constants';
@@ -32,21 +31,18 @@ export const useWebSocket = () => {
     ws.onopen = () => {
       console.log('WebSocket Connected');
       setStatus('connected');
-      reconnectAttemptRef.current = false; // Reset reconnect attempt flag
-      wsRef.current?.send('@'); // Send "@:" upon successful connection
-      // Confirm receipt with "#"
-      messageHandlersRef.current.forEach(handler => handler({ data: '#' } as MessageEvent));
+      reconnectAttemptRef.current = false;
+      wsRef.current?.send('CONNECT_REQUEST'); // Send initial connection request
     };
 
     ws.onclose = () => {
       console.log('WebSocket Disconnected');
       setStatus('disconnected');
       
-      // Attempt to reconnect once if this wasn't already a reconnection attempt
       if (!reconnectAttemptRef.current) {
         console.log('Attempting to reconnect...');
         reconnectAttemptRef.current = true;
-        setTimeout(connectWebSocket, 2000); // Wait 2 seconds before reconnecting
+        setTimeout(connectWebSocket, 2000);
       }
     };
 
@@ -56,8 +52,15 @@ export const useWebSocket = () => {
     };
 
     ws.onmessage = (event) => {
+      const message = event.data;
+      console.log('Message from ESP32:', message);
       messageHandlersRef.current.forEach(handler => handler(event));
-      wsRef.current?.send('*'); // Send "*" to the WebSocket upon receiving a message
+      if (message === '#') {
+        console.log('Connection acknowledged, sending *');
+        wsRef.current?.send('*'); // Trigger input scene
+      } else if (message.startsWith('KEY_PRESSED: ')) {
+        
+      }
     };
   }, []);
 
