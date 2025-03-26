@@ -1,6 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import type { EnglishGameState } from '../../types';
 import { soundManager } from '../../sounds/sound';
+
+const importLetter = (letter: string) => {
+  try {
+    return new URL(`../../media/${letter.toUpperCase()}.svg`, import.meta.url).href;
+  } catch {
+    return null;
+  }
+};
 
 interface EnglishGameProps {
   gameState: EnglishGameState;
@@ -8,21 +16,6 @@ interface EnglishGameProps {
 
 export const EnglishGame: React.FC<EnglishGameProps> = ({ gameState }) => {
   const { currentWord, hiddenIndex, userGuess, isCorrect } = gameState;
-  const [images, setImages] = useState<{ [key: string]: string }>({});
-
-  useEffect(() => {
-    const loadImages = async () => {
-      const imagePromises = currentWord.split('').map(async (letter) => {
-        const image = await import(`../../letters/${letter}.png`);
-        return { [letter]: image.default }; // Use image.default for default export
-      });
-      const loadedImages = await Promise.all(imagePromises);
-      const imagesObject = Object.assign({}, ...loadedImages);
-      setImages(imagesObject);
-    };
-
-    loadImages();
-  }, [currentWord]);
 
   useEffect(() => {
     if (isCorrect !== null) {
@@ -30,19 +23,35 @@ export const EnglishGame: React.FC<EnglishGameProps> = ({ gameState }) => {
     }
   }, [isCorrect]);
 
+
   return (
     <div className="flex flex-col items-center gap-8">
       <div className="flex gap-4 mb-8">
         {currentWord.split('').map((letter, index) => (
-          <div key={index} className="letter-box">
+          <div
+            key={index}
+            className={`letter-box ${index === hiddenIndex ? 'missing-letter' : ''} ${
+              index === hiddenIndex && isCorrect !== null
+                ? isCorrect
+                  ? 'correct-guess'
+                  : 'wrong-guess'
+                : ''
+            }`}
+          >
             {index === hiddenIndex ? (
-              isCorrect === null ? (
-                <img src={images['?']} alt="?" className="letter-image" />
-              ) : (
-                <img src={images[userGuess]} alt={userGuess} className="letter-image" />
+              isCorrect === null ? '?' : (
+                <img 
+                  src={importLetter(userGuess) || undefined} 
+                  alt={userGuess}
+                  className="w-40 h-40 animate-bounce"
+                />
               )
             ) : (
-              <img src={images[letter]} alt={letter} className="letter-image" />
+              <img 
+                src={importLetter(letter) || undefined} 
+                alt={letter}
+                className="w-40 h-40 animate-bounce-subtle"
+              />
             )}
           </div>
         ))}

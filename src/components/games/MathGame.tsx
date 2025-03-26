@@ -2,6 +2,13 @@ import React, { useEffect } from 'react';
 import type { MathGameState } from '../../types';
 import { soundManager } from '../../sounds/sound';
 
+const importNumeral = (numeral: string) => {
+  try {
+    return new URL(`../../media/${numeral}.svg`, import.meta.url).href;
+  } catch {
+    return null;
+  }
+};
 interface MathGameProps {
   gameState: MathGameState;
 }
@@ -21,7 +28,11 @@ export const MathGame: React.FC<MathGameProps> = ({ gameState }) => {
       <div className="flex gap-4 mb-8 items-center">
         {/* First number */}
         <div className="letter-box">
-          <span className="animate-bounce-subtle">{parts[0]}</span>
+          <img 
+            src={importNumeral(parts[0]) || undefined}
+            alt={parts[0]}
+            className="w-40 h-40 animate-bounce-subtle"
+          />
         </div>
 
         {/* Operator */}
@@ -31,7 +42,11 @@ export const MathGame: React.FC<MathGameProps> = ({ gameState }) => {
 
         {/* Second number */}
         <div className="letter-box">
-          <span className="animate-bounce-subtle">{parts[2]}</span>
+          <img 
+            src={importNumeral(parts[2]) || undefined}
+            alt={parts[2]}
+            className="w-40 h-40 animate-bounce-subtle"
+          />
         </div>
 
         {/* Equals sign */}
@@ -49,7 +64,13 @@ export const MathGame: React.FC<MathGameProps> = ({ gameState }) => {
               : ''
           }`}
         >
-          {userAnswer || '?'}
+          {isCorrect === null ? '?' : (
+            <img 
+              src={importNumeral(userAnswer) || undefined}
+              alt={userAnswer}
+              className="w-40 h-40 animate-bounce"
+            />
+          )}
         </div>
       </div>
       
