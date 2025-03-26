@@ -54,6 +54,8 @@ function App() {
 
   const [activeMode, setActiveMode] = useState<GameMode>(null);
 
+  const [isAudioReady, setIsAudioReady] = useState(false);
+
   // Game Logic
   const pickNewWord = useCallback(() => {
     const word = words[Math.floor(Math.random() * words.length)];
@@ -254,6 +256,31 @@ function App() {
     setScreenState('welcome');
   };
 
+  // Prepare audio and handle WebSocket connection
+  useEffect(() => {
+    const audio = document.getElementById('background-music') as HTMLAudioElement;
+
+    const handleUserInteraction = () => {
+      setIsAudioReady(true);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+
+    // Add event listener for user interaction
+    window.addEventListener('keydown', handleUserInteraction);
+
+    if (wsStatus === 'connected' && isAudioReady) {
+      audio.play().then(() => {
+        console.log("Background music is playing");
+      }).catch(error => {
+        console.error("Error playing audio:", error);
+      });
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, [wsStatus, isAudioReady]);
+
   // Render background elements
   const renderBackground = () => (
     <>
@@ -290,6 +317,13 @@ function App() {
 
   return (
     <div className="min-h-screen overflow-hidden relative bg-gradient-to-b from-sky-300 to-sky-500">
+      {/* Background Music */}
+      <audio 
+        id="background-music"
+        src="/../sounds/bg.mp3"
+        loop 
+      />
+
       <ConnectionStatus />
       
       {screenState === 'intro' && (
@@ -304,7 +338,7 @@ function App() {
           onEnded={handleIntroVideoEnd}
           className="absolute inset-0 w-full h-full object-cover"
         >
-          <source src="/Logo.mp4" type="video/mp4" />
+          <source src="/Logo-VEED.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
       )}

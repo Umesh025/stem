@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { EnglishGameState } from '../../types';
 import { soundManager } from '../../sounds/sound';
 
@@ -8,6 +8,21 @@ interface EnglishGameProps {
 
 export const EnglishGame: React.FC<EnglishGameProps> = ({ gameState }) => {
   const { currentWord, hiddenIndex, userGuess, isCorrect } = gameState;
+  const [images, setImages] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    const loadImages = async () => {
+      const imagePromises = currentWord.split('').map(async (letter) => {
+        const image = await import(`../../letters/${letter}.png`);
+        return { [letter]: image.default }; // Use image.default for default export
+      });
+      const loadedImages = await Promise.all(imagePromises);
+      const imagesObject = Object.assign({}, ...loadedImages);
+      setImages(imagesObject);
+    };
+
+    loadImages();
+  }, [currentWord]);
 
   useEffect(() => {
     if (isCorrect !== null) {
@@ -19,20 +34,15 @@ export const EnglishGame: React.FC<EnglishGameProps> = ({ gameState }) => {
     <div className="flex flex-col items-center gap-8">
       <div className="flex gap-4 mb-8">
         {currentWord.split('').map((letter, index) => (
-          <div
-            key={index}
-            className={`letter-box ${index === hiddenIndex ? 'missing-letter' : ''} ${
-              index === hiddenIndex && isCorrect !== null
-                ? isCorrect
-                  ? 'correct-guess'
-                  : 'wrong-guess'
-                : ''
-            }`}
-          >
+          <div key={index} className="letter-box">
             {index === hiddenIndex ? (
-              isCorrect === null ? '?' : userGuess
+              isCorrect === null ? (
+                <img src={images['?']} alt="?" className="letter-image" />
+              ) : (
+                <img src={images[userGuess]} alt={userGuess} className="letter-image" />
+              )
             ) : (
-              <span className="animate-bounce-subtle">{letter}</span>
+              <img src={images[letter]} alt={letter} className="letter-image" />
             )}
           </div>
         ))}

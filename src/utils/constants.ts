@@ -1,4 +1,4 @@
-export const words = [ 'ABC',
+export const wordsog = [ 'ABC',
     'DEF',
     'GHI',
     'JKL',
@@ -18,6 +18,11 @@ export const words = [ 'ABC',
     'ABCD',
     'BCDE',
     'FGH'];
+    export const words = [ 'AB',
+      'CD',
+      'ABCD',
+      'BCD',
+      ];
 
 export const GAME_CONSTANTS = {
   MAX_LIVES: 3,
