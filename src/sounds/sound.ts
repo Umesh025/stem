@@ -1,6 +1,6 @@
 // Sound effect URLs from mixkit.co (free sound effects)
 export const SOUNDS = {
-    correct: 'src/sounds/2000-preview.mp3',
+    correct: 'src/sounds/Collect-Bonus.mp3',
     wrong: 'src/sounds/2003-preview.mp3',
 };
 

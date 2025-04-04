@@ -74,7 +74,7 @@
 }
 
 .missing-letter {
- @apply bg-blue-200 border-4 border-dashed border-blue-500;
+ /* @apply bg-blue-200 border-4 border-dashed border-blue-500; */
  animation: bounce-subtle 1.5s ease-out infinite;
 }
 

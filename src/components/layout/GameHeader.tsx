@@ -56,7 +56,7 @@ export const GameHeader: React.FC<GameHeaderProps> = ({ gameState, onExit }) => 
       </button>
       
       {/* Centered content container */}
-      <div className="w-full h-full flex flex-col items-center justify-center gap-4 pt-8">
+      <div className="w-full h-full absolute top-14 right-0 p-4 flex flex-col items-end gap-4">
         {/* Score box with enhanced styling */}
         <div className="score-box bg-yellow-300 px-8 py-4 rounded-xl shadow-lg transform hover:scale-110 transition-transform">
           <span className="text-3xl font-bold text-gray-800">Score: {score}</span>

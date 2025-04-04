@@ -288,6 +288,12 @@ function App() {
     </div>
   );
 
+  const LogoComp = () => (
+    <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
+    <img src="/src/media/LogoWithStroke.png" alt="Logo" className="w-32 h-32" />
+  </div>
+  )
+
   return (
     <div className="min-h-screen overflow-hidden relative bg-gradient-to-b from-sky-300 to-sky-500">
       <audio 
@@ -303,7 +309,8 @@ function App() {
         }}
       />
       <ConnectionStatus />
-      
+      {(screenState !== 'welcome' && screenState !== 'selection') && 
+        <LogoComp />}
       {screenState === 'intro' && (
         <video 
           key="intro-video"
